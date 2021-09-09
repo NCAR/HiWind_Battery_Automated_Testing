@@ -16,7 +16,7 @@ p5=serial.Serial("com17",9600, timeout=0.5)
 p6=serial.Serial("com18",9600, timeout=0.5)
 load=serial.Serial("com11",9600, timeout=0.5)
 panels = [p1, p2, p3, p4, p5, p6]
-
+plot_data = True
 
 # In[82]:
 
@@ -25,27 +25,37 @@ panels = [p1, p2, p3, p4, p5, p6]
 def SendCommand(port, arg):
     if port != 'A':
         port.write((arg + "\n").encode())
+        
+        
 def GetResponse(port, arg):
     try:
         res=port.readline()
         return res.decode('ascii')
     except:
         return 'ERR'   
+
+    
 def QueryFloat(port, arg):
     res=Query(port,arg)
     try:
         return float(res)
     except:
         return 'ERR'
+
+    
 def Query(port, arg):
     SendCommand(port, arg)
     res=GetResponse(port,arg)
     return res
+
+
 def SetOutput(port, state):
     if (state):
         SendCommand(port, "OUTPUT ON")
     else:
         SendCommand(port, "OUTPUT OFF")
+
+        
 def MeasureVoltage(ports):
     return 10
     voltage = 0
@@ -59,16 +69,25 @@ def MeasureVoltage(ports):
     return voltage
     
     return QueryFloat(port, "MEAS:VOLT:DC?")
+
+
 def MeasureCurrent(port):
     return QueryFloat(port, "MEAS:CURR:DC?")
+
+
 def MeasureWattage(port):
     return QueryFloat(port, "MEAS:VOLT:DC?") * QueryFloat(port, "MEAS:CURR:DC?")
+
+
 def SetVoltage(port, val):
     if type(port) == list:
         for p in port:
             SendCommand(p, "VOLT "+str(val))
     else:
         SendCommand(port, "VOLT "+str(val))
+
+        
+        
 def SetCurrent(port, val):
     if type(port) == list:
         for p in port:
@@ -76,6 +95,9 @@ def SetCurrent(port, val):
     else:
         SendCommand(port, "CURR "+str(val))
 
+
+        
+        
 def SetInput(port, state):
     if (state):
         SendCommand(port, "INPUT ON")
@@ -99,6 +121,8 @@ def SetILimits(ports, battery_voltage, efficiency):
     amps=np.interp(battery_voltage,V,I) * efficiency
     SetCurrent(ports, amps)
     return amps
+
+
 def SolarAltitude(hour):
     E=np.array([0, 0,   10.78, 20.97, 30.28, 38.01, 43.25, 45.05, 42.98, 37.52, 29.65, 20.27, 10.04, 0,    0])
     H=np.array([0, 7.5, 8.5,   9.5,   10.5,  11.5,  12.5,  13.5,  14.5,  15.5,  16.5,  17.5,  18.5, 19.5, 24])
@@ -108,6 +132,8 @@ def SolarAltitude(hour):
             plt.plot(H,E)
             plt.suptitle("Solar Altitude")
     return np.interp(hour, H, E)
+
+
 def PanelEfficiency(hour, PanelAngle):
     # panel angle is normal to panel measured in degrees from horizon
     Altitude = SolarAltitude(hour)
@@ -116,6 +142,8 @@ def PanelEfficiency(hour, PanelAngle):
         return 0
     SolarAngle = abs(Altitude-PanelAngle)
     return math.cos(math.radians(SolarAngle)) * math.cos(math.radians(15))
+
+
 def SetLoad(port, hour):
     H=np.array([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24])
     L=np.array([7, 7, 7, 7, 7, 7,  7,  7,  7,  7,  7,  7,  7])
@@ -128,20 +156,29 @@ def SetLoad(port, hour):
     SetCurrent(port, load)
     return load
 
+
+
 def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scaling):
     # sleep duration is in hours
     start=time.time()
+    #Setup all the DC Power supplies
     for p in panel_ports:
         SetVoltage(p, 40)
         SetCurrent(p, 0)
         SetOutput(p, True)
+    #Setup the DC load
     SetCurrent(load_port, 0)
-    SetInput(load_port, True)    
+    SetInput(load_port, True)
+    
+    
     while (True):
+        #Find how many Hours its been running
         elapsed_hr=(time.time()-start) / 3600 * time_scaling
         #battery_v = MeasureVoltage(panel_ports)
         battery_v = MeasureVoltage(load_port)
+        #Get and Efficiency Percentage of the panel
         eff=PanelEfficiency(elapsed_hr, panel_angle)
+        
         i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
         load=SetLoad(load_port, elapsed_hr)
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
@@ -151,6 +188,7 @@ def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scal
                 SetOutput(p, False)
             SetInput(load_port, False)
             return
+        #wait one second
         time.sleep(sleep_duration*3600)
         
 
