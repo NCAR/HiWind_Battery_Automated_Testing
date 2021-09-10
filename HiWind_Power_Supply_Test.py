@@ -58,9 +58,7 @@ def SetOutput(port, state):
         SendCommand(port, "OUTPUT OFF")
 
 # brief Measure the voltage on the ports
-# @return the highest reported voltage arcross the given list of ports or the voltage on the port itself
-#TODO this may have unwanted implication when the MEER Charge Controller stops accepting power from a supply. 
-#ie return will always be 40V?? Maybe check to see if current is still being delivered from that supply 
+# @return the lowest reported voltage arcross the given list of ports or the voltage on the port itself
 def MeasureVoltage(ports):
     voltage = 0
     
@@ -68,7 +66,7 @@ def MeasureVoltage(ports):
     #Find the Highest voltage on all the ports and report that
         for p in port:
             v=MeasureVoltage(p)
-            if v > voltage:
+            if v < voltage:
                 voltage = v
     else:
         voltage = MeasureVoltage(ports)
