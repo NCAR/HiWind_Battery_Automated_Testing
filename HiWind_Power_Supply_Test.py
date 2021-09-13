@@ -109,6 +109,7 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
             plt.suptitle("IV Curve")
     amps = np.interp(voltage, V, I) * efficiency
     amps = min(amps, MaxAmpPerSupply)
+    print("Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency, amps, iter))
     SetCurrent(ports, amps)
     SetAgilentCurrent(agilent_port, amps)
     
