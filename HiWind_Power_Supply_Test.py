@@ -1,14 +1,13 @@
 #!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
+plot_data = True
 
 import numpy as np
 import serial, math, time
-import matplotlib.pyplot as plt
 
-get_ipython().run_line_magic('matplotlib', '')
+if (plot_data):
+    import matplotlib.pyplot as plt
+    get_ipython().run_line_magic('matplotlib', '')
+
 
 #TODO Do we need to becarful bc the Com Ports and swap around 
 # between systems Make sure if your using the Aligent you figure this out in the future
@@ -17,90 +16,37 @@ p2 = serial.Serial("com14", 9600, timeout=0.5)
 p3 = serial.Serial("com15", 9600, timeout=0.5)
 p4 = serial.Serial("com16", 9600, timeout=0.5)
 p5 = serial.Serial("com17", 9600, timeout=0.5)
-p6 = serial.Serial("com18", 9600, timeout=0.5)
+
 load = serial.Serial("com11", 9600, timeout=0.5)
-Agilent_Port = serial.Serial("com2", 9600, timeout=0.5)
-panels = [p1, p2, p3, p4, p5, p6]
-plot_data = True
+agilent = serial.Serial("com12", 9600, timeout=0.5)
+panels = [p1, p2, p3, p4, p5]
 
-# In[82]:
-MaxAmpPerSupply = 6
-
-
-# Array communication routines
-def SendCommand(port, arg):
-    if port != 'A':
-        port.write((arg + "\n").encode())
-
-
-def GetResponse(port, arg):
-    try:
-        res = port.readline()
-        return res.decode('ascii')
-    except:
-        return 'ERR'
-
-
-def QueryFloat(port, arg):
-    res = Query(port, arg)
-    try:
-        return float(res)
-    except:
-        return 'ERR'
-
-
-# Brief ask a port for info
-# Return the response
-def Query(port, arg):
-    SendCommand(port, arg)
-    res = GetResponse(port, arg)
-    return res
-
-
-# Brief: Turn the output on or off
-def SetOutput(port, state):
-    if (state):
-        SendCommand(port, "OUTPUT ON")
-    else:
-        SendCommand(port, "OUTPUT OFF")
+MaxAmpPerSupply = 6.1
 
 
 # brief Measure the voltage on the ports
 # @return the lowest reported voltage arcross the given list of ports or the voltage on the port itself
 def MeasureVoltage(ports):
-    voltage = 10000
-
     if type(ports) == list:
-        # Find the Highest voltage on all the ports and report that
+        voltage = 40
+        # Find the lowest voltage on all the ports and report that
         for p in ports:
-            if p == Agilent_Port:
-                v = 40
-            else:
-                v = MeasureVoltage(p)
+            v = MeasureVoltage(p)
             if v < voltage:
                 voltage = v
     else:
-        voltage = MeasureVoltage(ports)
+        voltage = QueryFloat(port, "MEAS:VOLT:DC?")
     return voltage
-
-    return QueryFloat(port, "MEAS:VOLT:DC?")
 
 
 def MeasureCurrent(port):
     return QueryFloat(port, "MEAS:CURR:DC?")
 
 
-def MeasureWattage(port):
-    return QueryFloat(port, "MEAS:VOLT:DC?") * QueryFloat(port, "MEAS:CURR:DC?")
-
-
-def SetVoltage(port, val):
-    if type(port) == list:
+def SetVoltage(ports, val):
+    if type(ports) == list:
         for p in port:
-            if p == Agilent_Port:
-                break
-            else:
-                SendCommand(p, "VOLT " + str(val))
+            SendCommand(p, "VOLT " + str(val))
     else:
         SendCommand(port, "VOLT " + str(val))
 
@@ -108,33 +54,30 @@ def SetVoltage(port, val):
 def SetCurrent(port, val):
     if type(port) == list:
         for p in port:
-            if p == Agilent_Port:
-                volt = AgilentLookUp(val)
-                SendCommand(Agilent_Port, "VOLT " + str(volt))
-            else:
-                SendCommand(p, "CURR " + str(val))
+            SendCommand(p, "CURR " + str(val))
     else:
         SendCommand(port, "CURR " + str(val))
 
-
+def SetAgilentCurrent(port, val):
+        volt = AgilentLookUp(val)
+        volt = min(5, volt) # it's good to be paranoid
+        SetVoltage(port, volt)
+        
+       
 # This will look up the correct value to set the Voltage on the Array power Supply that will drive the current output of the Agilent
 def AgilentLookUp(Current):
-    AgilentVoltageMax = 5
+    AgilentCommandVoltageMax = 5
     AgilentCurrentMax = 15
     # Transfer Function from Current to Voltage
-    Voltage = AgilentVoltageMax * Current / AgilentCurrentMax
+    Voltage = AgilentCommandVoltageMax * Current / AgilentCurrentMax
     # Make sure that the voltage we set wont have bad consequences by making sure that it is under the MaxAmpPerSupply Current
+    Voltage = min(Voltage, AgilentCommandVoltageMax) # never exceed 5 v
+    Voltage = min(Voltage, MaxAmpPerSupply / AgilentCurrentMax * AgilentCommandVoltageMax) # never exceed the equiv of 6.5A out
     if Voltage < AgilentVoltageMax * MaxAmpPerSupply / AgilentCurrentMax
         return Voltage
     else:
-        exit
+        return 0
 
-
-def SetInput(port, state):
-    if (state):
-        SendCommand(port, "INPUT ON")
-    else:
-        SendCommand(port, "INPUT OFF")
 
 
 # Brief: set the current limit to match the voltage according to the IVCurve.
@@ -163,14 +106,16 @@ def MatchIVCurve(ports, voltage, efficiency, iter=0):
          5.829660, 5.793330, 5.750380, 5.692520, 5.630720, 5.543880, 5.456100, 5.351510, 5.206550, 5.056390, 4.854200,
          4.643870, 4.395210, 4.068380, 3.732880, 3.297580, 2.857340, 2.358660, 1.732930, 1.122470, 0.443290, 0])
     amps = np.interp(voltage, V, I) * efficiency
-
+    amps = min(amps, MaxAmpPerSupply)
     SetCurrent(ports, amps)
+    SetAgilentCurrent(agilent_port, amps)
+    
     # give time to update and leave transient state
     time.sleep(2)
     # re measure voltage and divide by 2 to get voltage on single panel
     updated_voltage = MeasureVoltage(ports)/2
     # If the difference between the measured voltage and the expected voltage is greater than 10%
-    if ((abs(updated_voltage - V) > V * .1) and (iter < 5)):
+    if ((abs(updated_voltage - V) > (V * .1)) and (iter < 5)):
         # re set the current to better match
         iter += 1
         MatchIVCurve(ports, updated_voltage, efficiency, iter)
@@ -200,7 +145,7 @@ def SetILimits(ports, battery_voltage, efficiency):
          6.001920, 5.995520, 5.990060, 5.982500, 5.974090, 5.962960, 5.948790, 5.933620, 5.914400, 5.890820, 5.864310,
          5.829660, 5.793330, 5.750380, 5.692520, 5.630720, 5.543880, 5.456100, 5.351510, 5.206550, 5.056390, 4.854200,
          4.643870, 4.395210, 4.068380, 3.732880, 3.297580, 2.857340, 2.358660, 1.732930, 1.122470, 0.443290, 0])
-    if 'plt' in dir():
+    if (plot_data):
         if not plt.fignum_exists(1):
             plt.figure(1)
             plt.plot(V, I)
@@ -213,7 +158,7 @@ def SetILimits(ports, battery_voltage, efficiency):
 def SolarAltitude(hour):
     E = np.array([0, 0, 10.78, 20.97, 30.28, 38.01, 43.25, 45.05, 42.98, 37.52, 29.65, 20.27, 10.04, 0, 0])
     H = np.array([0, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5, 24])
-    if 'plt' in dir():
+    if (plot_data):
         if not plt.fignum_exists(2):
             plt.figure(2)
             plt.plot(H, E)
@@ -234,7 +179,7 @@ def PanelEfficiency(hour, PanelAngle):
 def SetLoad(port, hour):
     H = np.array([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24])
     L = np.array([7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7])
-    if 'plt' in dir():
+    if (plot_data):
         if not plt.fignum_exists(3):
             plt.figure(3)
             plt.plot(H, L)
@@ -244,7 +189,7 @@ def SetLoad(port, hour):
     return load
 
 
-def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scaling):
+def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_duration, time_scaling):
     # sleep duration is in hours
     start = time.time()
     # Setup all the DC Power supplies
@@ -252,6 +197,9 @@ def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scal
         SetVoltage(p, 40)
         SetCurrent(p, 0)
         SetOutput(p, True)
+    SetCurrent(agilent_port, 1/30) # make sure our control signal cannot push current
+    SetVoltage(agilent_port, 0) # this turns off the current from the agilent to the MEER
+    SetOutput(agilent_port, True)
     # Setup the DC load
     SetCurrent(load_port, 0)
     SetInput(load_port, True)
@@ -259,6 +207,7 @@ def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scal
     while (True):
         # Find how many Hours its been running
         elapsed_hr = (time.time() - start) / 3600 * time_scaling
+        
         panelPair_v = MeasureVoltage(panel_ports)
         # battery_v = MeasureVoltage(load_port)
         # Get and Efficiency Percentage of the panel
@@ -272,13 +221,57 @@ def RunSimulation(panel_ports, load_port, panel_angle, sleep_duration, time_scal
         if (elapsed_hr + sleep_duration * time_scaling) >= 24:
             for p in panel_ports:
                 SetOutput(p, False)
+            SetOutput(agilent_port, False)
             SetInput(load_port, False)
             return
-        # wait one second
+        # wait one sleep duration
         time.sleep(sleep_duration * 3600)
 
+        
+# Array communication routines
+def SendCommand(port, arg):
+    if port != 'A':
+        port.write((arg + "\n").encode())
 
-# In[90]:
+        
+def GetResponse(port, arg):
+    try:
+        res = port.readline()
+        return res.decode('ascii')
+    except:
+        return 'ERR'
 
 
-RunSimulation('A', 'A', 22, 1 / 3600, 5000)
+def QueryFloat(port, arg):
+    res = Query(port, arg)
+    try:
+        return float(res)
+    except:
+        return 'ERR'
+
+
+def SetInput(port, state):
+    if (state):
+        SendCommand(port, "INPUT ON")
+    else:
+        SendCommand(port, "INPUT OFF")
+
+
+# Brief ask a port for info
+# Return the response
+def Query(port, arg):
+    SendCommand(port, arg)
+    res = GetResponse(port, arg)
+    return res
+
+
+# Brief: Turn the output on or off
+def SetOutput(port, state):
+    if (state):
+        SendCommand(port, "OUTPUT ON")
+    else:
+        SendCommand(port, "OUTPUT OFF")
+
+RunSimulation(panels, load, agilent, 22, 5 / 3600, 5000)
+
+
