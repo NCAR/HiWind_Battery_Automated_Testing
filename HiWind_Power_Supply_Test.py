@@ -72,16 +72,13 @@ def AgilentLookUp(Current):
     Voltage = AgilentCommandVoltageMax * Current / AgilentCurrentMax
     # Make sure that the voltage we set wont have bad consequences by making sure that it is under the MaxAmpPerSupply Current
     Voltage = min(Voltage, AgilentCommandVoltageMax) # never exceed 5 v
-    Voltage = min(Voltage, MaxAmpPerSupply / AgilentCurrentMax * AgilentCommandVoltageMax) # never exceed the equiv of 6.5A out
-    if Voltage < AgilentVoltageMax * MaxAmpPerSupply / AgilentCurrentMax
-        return Voltage
-    else:
-        return 0
-
+    Voltage = min(Voltage, MaxAmpPerSupply / AgilentCurrentMax * AgilentCommandVoltageMax) # never exceed the equiv of 6.1A out
+    return Voltage
 
 
 # Brief: set the current limit to match the voltage according to the IVCurve.
-# If the new voltage of the DC power supply is greater than 10% different than the expected voltage then change the current limit again to better match
+# Determine the panel current for the currently measured voltage. If the current measured is more than 10% different from what we calculate the panel
+# can produce at this voltage, change the current and measure again.
 def MatchIVCurve(ports, voltage, efficiency, iter=0):
     # IV Curve
     V = np.array([0, 0.197580, 0.414510, 0.610210, 0.832040, 1.027920, 1.223620, 1.441310, 1.634370, 1.850560, 2.051890,
@@ -113,12 +110,13 @@ def MatchIVCurve(ports, voltage, efficiency, iter=0):
     # give time to update and leave transient state
     time.sleep(2)
     # re measure voltage and divide by 2 to get voltage on single panel
-    updated_voltage = MeasureVoltage(ports)/2
-    # If the difference between the measured voltage and the expected voltage is greater than 10%
-    if ((abs(updated_voltage - V) > (V * .1)) and (iter < 5)):
+    panel_voltage = MeasureVoltage(ports)/2
+    panel_current = np.interp(panel_voltage, V, I) * efficiency
+    # If the difference between the set current and the panel's expected current is greater than 10%
+    if ((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
         # re set the current to better match
         iter += 1
-        MatchIVCurve(ports, updated_voltage, efficiency, iter)
+        MatchIVCurve(ports, panel_voltage, efficiency, iter)
     return amps
 
 
