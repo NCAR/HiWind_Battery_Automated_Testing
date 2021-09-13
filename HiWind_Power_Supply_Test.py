@@ -3,13 +3,15 @@ plot_data = True
 
 import numpy as np
 import serial, math, time
-import os
+import logging
+from datetime import datetime
+
 if (plot_data):
     import matplotlib.pyplot as plt
-  #  get_ipython().run_line_magic('matplotlib', '')
+#  get_ipython().run_line_magic('matplotlib', '')
 
 
-#TODO Do we need to becarful bc the Com Ports and swap around 
+# TODO Do we need to becarful bc the Com Ports and swap around
 # between systems Make sure if your using the Aligent you figure this out in the future
 p1 = serial.Serial("com9", 9600, timeout=0.5)
 p2 = serial.Serial("com10", 9600, timeout=0.5)
@@ -23,21 +25,10 @@ panels = [p1, p2, p3, p4, p5]
 
 MaxAmpPerSupply = 6.1
 
-def logging_ports(port):
-    #Voltage
-    #Current
-    #Time
-    #Simulated Time
-    #Port
-    return
-    
-def logging_load(port):
-
-    #Voltage
-    #Current
-    #Time
-    #Port
-    return
+def logging_setup():
+    filename = f"{datetime.date().today.strftime('%m%d%Y%H%M')}.log"
+    logging.basicConfig(filename=filename, encoding='utf-8', level=logging.DEBUG)
+    logging.info("Time\tSim Time\tSolar Alt\tPanel Eff\tPort\tVoltage\tCurrent")
 
 # brief Measure the voltage on the ports
 # @return the lowest reported voltage arcross the given list of ports or the voltage on the port itself
@@ -73,12 +64,13 @@ def SetCurrent(ports, val):
     else:
         SendCommand(ports, "CURR " + str(val))
 
+
 def SetAgilentCurrent(port, val):
-        volt = AgilentLookUp(val)
-        volt = min(5, volt) # it's good to be paranoid
-        SetVoltage(port, volt)
-        
-       
+    volt = AgilentLookUp(val)
+    volt = min(5, volt)  # it's good to be paranoid
+    SetVoltage(port, volt)
+
+
 # This will look up the correct value to set the Voltage on the Array power Supply that will drive the current output of the Agilent
 def AgilentLookUp(Current):
     AgilentCommandVoltageMax = 5
@@ -86,8 +78,9 @@ def AgilentLookUp(Current):
     # Transfer Function from Current to Voltage
     Voltage = AgilentCommandVoltageMax * Current / AgilentCurrentMax
     # Make sure that the voltage we set wont have bad consequences by making sure that it is under the MaxAmpPerSupply Current
-    Voltage = min(Voltage, AgilentCommandVoltageMax) # never exceed 5 v
-    Voltage = min(Voltage, MaxAmpPerSupply / AgilentCurrentMax * AgilentCommandVoltageMax) # never exceed the equiv of 6.1A out
+    Voltage = min(Voltage, AgilentCommandVoltageMax)  # never exceed 5 v
+    Voltage = min(Voltage,
+                  MaxAmpPerSupply / AgilentCurrentMax * AgilentCommandVoltageMax)  # never exceed the equiv of 6.1A out
     return Voltage
 
 
@@ -124,14 +117,16 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
             plt.suptitle("IV Curve")
     amps = np.interp(voltage, V, I) * efficiency
     amps = min(amps, MaxAmpPerSupply)
-    print("Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency, amps, iter))
+    print(
+        "Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency,
+                                                                                                    amps, iter))
     SetCurrent(panel_ports, amps)
     SetAgilentCurrent(agilent_port, amps)
-    
+
     # give time to update and leave transient state
     time.sleep(2)
     # re measure voltage and divide by 2 to get voltage on single panel
-    panel_voltage = MeasureVoltage(panel_ports)/2
+    panel_voltage = MeasureVoltage(panel_ports) / 2
     panel_current = np.interp(panel_voltage, V, I) * efficiency
     # If the difference between the set current and the panel's expected current is greater than 10%
     if (((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
@@ -175,6 +170,26 @@ def SetLoad(port, hour):
     return load
 
 
+def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
+
+    Time = datetime.now.strftime('%H:%M:%S')
+    Sim_Time = elapsedTime
+    Solar_Alt = Solar_Alt
+    Panel_Eff = Panel_Eff
+    for port in ports:
+        Port = port.name
+        Voltage = MeasureVoltage(port)
+        Current = MeasureCurrent(port)
+        logging.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
+    # Voltage
+    # Current
+    # Time
+    # Simulated Time
+    # Port
+    return
+
+
+
 def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_duration, time_scaling):
     # sleep duration is in hours
     start = time.time()
@@ -183,8 +198,8 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
         SetVoltage(p, 40)
         SetCurrent(p, 0)
         SetOutput(p, True)
-    SetCurrent(agilent_port, 1/30) # make sure our control signal cannot push current
-    SetVoltage(agilent_port, 0) # this turns off the current from the agilent to the MEER
+    SetCurrent(agilent_port, 1 / 30)  # make sure our control signal cannot push current
+    SetVoltage(agilent_port, 0)  # this turns off the current from the agilent to the MEER
     SetOutput(agilent_port, True)
     # Setup the DC load
     SetCurrent(load_port, 0)
@@ -193,7 +208,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
     while (True):
         # Find how many Hours its been running
         elapsed_hr = (time.time() - start) / 3600 * time_scaling
-        
+
         panelPair_v = MeasureVoltage(panel_ports)
         # battery_v = MeasureVoltage(load_port)
         # Get and Efficiency Percentage of the panel
@@ -202,8 +217,11 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
         load = SetLoad(load_port, elapsed_hr)
+
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
             elapsed_hr, SolarAltitude(elapsed_hr), eff * 100, i, load))
+        write_to_log(panel_ports.append(load_port), elapsed_hr, SolarAltitude(elapsed_hr), eff*100)
+
         if (elapsed_hr + sleep_duration * time_scaling) >= 24:
             for p in panel_ports:
                 SetOutput(p, False)
@@ -213,13 +231,13 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
         # wait one sleep duration
         time.sleep(sleep_duration * 3600)
 
-        
+
 # Array communication routines
 def SendCommand(port, arg):
     if port != 'A':
         port.write((arg + "\n").encode())
 
-        
+
 def GetResponse(port, arg):
     try:
         res = port.readline()
@@ -258,4 +276,5 @@ def SetOutput(port, state):
     else:
         SendCommand(port, "OUTPUT OFF")
 
+logging_setup()
 RunSimulation(panels, load, agilent, 22, 15 / 3600, 500)
