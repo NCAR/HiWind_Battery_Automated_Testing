@@ -51,12 +51,12 @@ def SetVoltage(ports, val):
         SendCommand(ports, "VOLT " + str(val))
 
 
-def SetCurrent(port, val):
-    if type(port) == list:
-        for p in port:
+def SetCurrent(ports, val):
+    if type(ports) == list:
+        for p in ports:
             SendCommand(p, "CURR " + str(val))
     else:
-        SendCommand(port, "CURR " + str(val))
+        SendCommand(ports, "CURR " + str(val))
 
 def SetAgilentCurrent(port, val):
         volt = AgilentLookUp(val)
@@ -79,49 +79,8 @@ def AgilentLookUp(Current):
 # Brief: set the current limit to match the voltage according to the IVCurve.
 # Determine the panel current for the currently measured voltage. If the current measured is more than 10% different from what we calculate the panel
 # can produce at this voltage, change the current and measure again.
-def MatchIVCurve(ports, voltage, efficiency, iter=0):
+def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
     # IV Curve
-    V = np.array([0, 0.197580, 0.414510, 0.610210, 0.832040, 1.027920, 1.223620, 1.441310, 1.634370, 1.850560, 2.051890,
-                  2.248720, 2.466780, 2.657780, 2.876030, 3.070980, 3.271940, 3.487560, 3.685320, 3.900760, 4.096450,
-                  4.288950, 4.515480, 4.707980, 4.926230, 5.122300, 5.318560, 5.542460, 5.736650, 5.954720, 6.146280,
-                  6.338400, 6.561540, 6.763820, 6.953310, 7.174010, 7.360680, 7.582700, 7.776140, 7.974650, 8.190840,
-                  8.387470, 8.604980, 8.799360, 8.997680, 9.224020, 9.416140, 9.632900, 9.826900, 10.018650, 10.237280,
-                  10.435790, 10.659690, 10.848800, 11.041680, 11.262000, 11.458830, 11.683280, 11.873340, 12.071860,
-                  12.283530, 12.479230, 12.695410, 12.899380, 13.092820, 13.309950, 13.503200, 13.723710, 13.919220,
-                  14.119990, 14.340870, 14.530930, 14.753320, 14.943380, 15.141520, 15.363720, 15.558850, 15.774280,
-                  15.971110, 16.167370, 16.391640, 16.585640, 16.804840, 16.992820, 17.185510, 17.409410, 17.607550,
-                  17.824300, 18.020740, 18.210420, 18.429050, 18.621930, 18.846770, 19.041520, 19.237030, 19.450580,
-                  19.640640, 19.839530, 20])
-    I = np.array(
-        [6.083830, 6.083830, 6.083830, 6.083620, 6.083140, 6.081830, 6.081780, 6.081830, 6.081460, 6.079890, 6.079360,
-         6.077370, 6.075110, 6.073850, 6.072170, 6.071330, 6.070330, 6.069180, 6.067600, 6.067130, 6.067340, 6.065350,
-         6.064820, 6.064240, 6.064240, 6.063610, 6.062670, 6.062930, 6.061990, 6.060040, 6.060250, 6.059520, 6.057890,
-         6.058630, 6.056790, 6.056470, 6.055580, 6.054640, 6.052690, 6.052540, 6.051540, 6.049810, 6.049700, 6.049230,
-         6.048700, 6.048490, 6.046600, 6.045130, 6.044450, 6.042400, 6.041140, 6.040770, 6.038570, 6.038250, 6.036420,
-         6.034370, 6.033060, 6.031110, 6.028170, 6.026020, 6.023450, 6.020670, 6.016200, 6.013630, 6.009170, 6.005860,
-         6.001920, 5.995520, 5.990060, 5.982500, 5.974090, 5.962960, 5.948790, 5.933620, 5.914400, 5.890820, 5.864310,
-         5.829660, 5.793330, 5.750380, 5.692520, 5.630720, 5.543880, 5.456100, 5.351510, 5.206550, 5.056390, 4.854200,
-         4.643870, 4.395210, 4.068380, 3.732880, 3.297580, 2.857340, 2.358660, 1.732930, 1.122470, 0.443290, 0])
-    amps = np.interp(voltage, V, I) * efficiency
-    amps = min(amps, MaxAmpPerSupply)
-    SetCurrent(ports, amps)
-    SetAgilentCurrent(agilent, amps)
-    
-    # give time to update and leave transient state
-    time.sleep(2)
-    # re measure voltage and divide by 2 to get voltage on single panel
-    panel_voltage = MeasureVoltage(ports)/2
-    panel_current = np.interp(panel_voltage, V, I) * efficiency
-    # If the difference between the set current and the panel's expected current is greater than 10%
-    if (((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
-        # re set the current to better match
-        iter += 1
-        MatchIVCurve(ports, panel_voltage, efficiency, iter)
-    return amps
-
-#TODO This is not being used should remove to avaoid future confusion
-def SetILimits(ports, battery_voltage, efficiency):
-    # flux is a ratio of incident power vs. IV data test conditions
     V = np.array([0, 0.197580, 0.414510, 0.610210, 0.832040, 1.027920, 1.223620, 1.441310, 1.634370, 1.850560, 2.051890,
                   2.248720, 2.466780, 2.657780, 2.876030, 3.070980, 3.271940, 3.487560, 3.685320, 3.900760, 4.096450,
                   4.288950, 4.515480, 4.707980, 4.926230, 5.122300, 5.318560, 5.542460, 5.736650, 5.954720, 6.146280,
@@ -148,8 +107,21 @@ def SetILimits(ports, battery_voltage, efficiency):
             plt.figure(1)
             plt.plot(V, I)
             plt.suptitle("IV Curve")
-    amps = np.interp(battery_voltage, V, I) * efficiency
+    amps = np.interp(voltage, V, I) * efficiency
+    amps = min(amps, MaxAmpPerSupply)
     SetCurrent(ports, amps)
+    SetAgilentCurrent(agilent_port, amps)
+    
+    # give time to update and leave transient state
+    time.sleep(2)
+    # re measure voltage and divide by 2 to get voltage on single panel
+    panel_voltage = MeasureVoltage(ports)/2
+    panel_current = np.interp(panel_voltage, V, I) * efficiency
+    # If the difference between the set current and the panel's expected current is greater than 10%
+    if (((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
+        # re set the current to better match
+        iter += 1
+        MatchIVCurve(panel_ports, agilent_port, panel_voltage, efficiency, iter)
     return amps
 
 
@@ -211,7 +183,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
         # Get and Efficiency Percentage of the panel
         eff = PanelEfficiency(elapsed_hr, panel_angle)
 
-        i = MatchIVCurve(panel_ports, panelPair_v / 2, eff)
+        i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
         load = SetLoad(load_port, elapsed_hr)
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
