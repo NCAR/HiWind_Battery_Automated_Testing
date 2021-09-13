@@ -3,26 +3,41 @@ plot_data = True
 
 import numpy as np
 import serial, math, time
-
+import os
 if (plot_data):
     import matplotlib.pyplot as plt
-    get_ipython().run_line_magic('matplotlib', '')
+  #  get_ipython().run_line_magic('matplotlib', '')
 
 
 #TODO Do we need to becarful bc the Com Ports and swap around 
 # between systems Make sure if your using the Aligent you figure this out in the future
-p1 = serial.Serial("com13", 9600, timeout=0.5)
-p2 = serial.Serial("com14", 9600, timeout=0.5)
-p3 = serial.Serial("com15", 9600, timeout=0.5)
-p4 = serial.Serial("com16", 9600, timeout=0.5)
-p5 = serial.Serial("com17", 9600, timeout=0.5)
+p1 = serial.Serial("com9", 9600, timeout=0.5)
+p2 = serial.Serial("com10", 9600, timeout=0.5)
+p3 = serial.Serial("com11", 9600, timeout=0.5)
+p4 = serial.Serial("com12", 9600, timeout=0.5)
+p5 = serial.Serial("com13", 9600, timeout=0.5)
 
-load = serial.Serial("com11", 9600, timeout=0.5)
-agilent = serial.Serial("com12", 9600, timeout=0.5)
+load = serial.Serial("com7", 9600, timeout=0.5)
+agilent = serial.Serial("com8", 9600, timeout=0.5)
 panels = [p1, p2, p3, p4, p5]
 
 MaxAmpPerSupply = 6.1
 
+def logging_ports(port):
+    #Voltage
+    #Current
+    #Time
+    #Simulated Time
+    #Port
+    return
+    
+def logging_load(port):
+
+    #Voltage
+    #Current
+    #Time
+    #Port
+    return
 
 # brief Measure the voltage on the ports
 # @return the lowest reported voltage arcross the given list of ports or the voltage on the port itself
@@ -110,13 +125,13 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
     amps = np.interp(voltage, V, I) * efficiency
     amps = min(amps, MaxAmpPerSupply)
     print("Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency, amps, iter))
-    SetCurrent(ports, amps)
+    SetCurrent(panel_ports, amps)
     SetAgilentCurrent(agilent_port, amps)
     
     # give time to update and leave transient state
     time.sleep(2)
     # re measure voltage and divide by 2 to get voltage on single panel
-    panel_voltage = MeasureVoltage(ports)/2
+    panel_voltage = MeasureVoltage(panel_ports)/2
     panel_current = np.interp(panel_voltage, V, I) * efficiency
     # If the difference between the set current and the panel's expected current is greater than 10%
     if (((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
@@ -243,6 +258,4 @@ def SetOutput(port, state):
     else:
         SendCommand(port, "OUTPUT OFF")
 
-RunSimulation(panels, load, agilent, 22, 5 / 3600, 5000)
-
-
+RunSimulation(panels, load, agilent, 22, 15 / 3600, 500)
