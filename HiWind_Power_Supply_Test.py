@@ -35,7 +35,7 @@ def MeasureVoltage(ports):
             if v < voltage:
                 voltage = v
     else:
-        voltage = QueryFloat(port, "MEAS:VOLT:DC?")
+        voltage = QueryFloat(ports, "MEAS:VOLT:DC?")
     return voltage
 
 
@@ -45,10 +45,10 @@ def MeasureCurrent(port):
 
 def SetVoltage(ports, val):
     if type(ports) == list:
-        for p in port:
+        for p in ports:
             SendCommand(p, "VOLT " + str(val))
     else:
-        SendCommand(port, "VOLT " + str(val))
+        SendCommand(ports, "VOLT " + str(val))
 
 
 def SetCurrent(port, val):
@@ -105,7 +105,7 @@ def MatchIVCurve(ports, voltage, efficiency, iter=0):
     amps = np.interp(voltage, V, I) * efficiency
     amps = min(amps, MaxAmpPerSupply)
     SetCurrent(ports, amps)
-    SetAgilentCurrent(agilent_port, amps)
+    SetAgilentCurrent(agilent, amps)
     
     # give time to update and leave transient state
     time.sleep(2)
@@ -113,13 +113,13 @@ def MatchIVCurve(ports, voltage, efficiency, iter=0):
     panel_voltage = MeasureVoltage(ports)/2
     panel_current = np.interp(panel_voltage, V, I) * efficiency
     # If the difference between the set current and the panel's expected current is greater than 10%
-    if ((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
+    if (((abs(amps - panel_current)) > (amps * .1)) and (iter < 5)):
         # re set the current to better match
         iter += 1
         MatchIVCurve(ports, panel_voltage, efficiency, iter)
     return amps
 
-
+#TODO This is not being used should remove to avaoid future confusion
 def SetILimits(ports, battery_voltage, efficiency):
     # flux is a ratio of incident power vs. IV data test conditions
     V = np.array([0, 0.197580, 0.414510, 0.610210, 0.832040, 1.027920, 1.223620, 1.441310, 1.634370, 1.850560, 2.051890,
