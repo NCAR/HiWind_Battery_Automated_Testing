@@ -26,8 +26,9 @@ panels = [p1, p2, p3, p4, p5]
 MaxAmpPerSupply = 6.1
 
 def logging_setup():
-    filename = f"{datetime.date().today.strftime('%m%d%Y%H%M')}.log"
-    logging.basicConfig(filename=filename, encoding='utf-8', level=logging.DEBUG)
+    CurrentDateTime = datetime.now().strftime("%d%b%Y_%H%M")
+    filename=f"HiWind_Panel_{CurrentDateTime}.log"
+    logging.basicConfig(format='%(message)s',filename=filename, level=logging.DEBUG)
     logging.info("Time\tSim Time\tSolar Alt\tPanel Eff\tPort\tVoltage\tCurrent")
 
 # brief Measure the voltage on the ports
@@ -172,14 +173,15 @@ def SetLoad(port, hour):
 
 def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
 
-    Time = datetime.now.strftime('%H:%M:%S')
-    Sim_Time = elapsedTime
-    Solar_Alt = Solar_Alt
-    Panel_Eff = Panel_Eff
+    Time = str(datetime.now().strftime("%d%b%y %H:%M:%S"))
+
+    Sim_Time = "{:5.2f}hr".format(elapsedTime)
+    Solar_Alt = "{:5.2f}".format(Solar_Alt)
+    Panel_Eff = "{:5.2f}".format(Panel_Eff)
     for port in ports:
         Port = port.name
-        Voltage = MeasureVoltage(port)
-        Current = MeasureCurrent(port)
+        Voltage = "{:5.2f}".format(MeasureVoltage(port))
+        Current = "{:5.2f}".format(MeasureCurrent(port))
         logging.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
     # Voltage
     # Current
@@ -194,6 +196,9 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
     # sleep duration is in hours
     start = time.time()
     # Setup all the DC Power supplies
+    all_ports = panel_ports
+    all_ports.append(agilent_port)
+    all_ports.append(load_port)
     for p in panel_ports:
         SetVoltage(p, 40)
         SetCurrent(p, 0)
@@ -220,7 +225,9 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
 
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
             elapsed_hr, SolarAltitude(elapsed_hr), eff * 100, i, load))
-        write_to_log(panel_ports.append(load_port), elapsed_hr, SolarAltitude(elapsed_hr), eff*100)
+
+
+        write_to_log(all_ports, elapsed_hr, SolarAltitude(elapsed_hr), eff*100)
 
         if (elapsed_hr + sleep_duration * time_scaling) >= 24:
             for p in panel_ports:
@@ -277,4 +284,4 @@ def SetOutput(port, state):
         SendCommand(port, "OUTPUT OFF")
 
 logging_setup()
-RunSimulation(panels, load, agilent, 22, 15 / 3600, 500)
+RunSimulation(panels, load, agilent, 22, 1 / 60, 1)
