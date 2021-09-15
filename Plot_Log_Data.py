@@ -3,8 +3,13 @@ import matplotlib.pyplot as plt
 import datetime
 
 def MatchBeginnings(Battery1Filename, Battery1DF, Battery2Filename, Battery2DF, Hiwind_Panel_Filename):
-    datetime = Battery1Filename.split("-Serial")[0]
-    datetime.strptime('Jun 1 2005  1:33PM', '%b %d %Y %I:%M%p')
+    Filenamedatetime = Battery1Filename.split("-Serial")[0]
+    BatteryStartCollecting = datetime.strptime( Filenamedatetime, '%Y-%m-%d-%H-%M')
+
+    Hiwind_PanelStart_Collecting = datetime.strptime(Hiwind_Panel_Filename.split('Hiwind_Panel_')[1].split('.log')[0], '%d%b%Y-%H%M')
+    difference = BatteryStartCollecting - Hiwind_PanelStart_Collecting
+    difference.total_second()
+
     return
 
 def BatteryDataParsing(filename):
