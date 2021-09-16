@@ -1,7 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime
+import numpy as np
 
+def FormatPanelData(data):
+    data1 = data
+    data1['Sim Time'] = data['Sim Time'].map(lambda x: x.rstrip('hr')).astype(float)
+    return data1
 
 def MatchBeginnings(Battery1Filename, Hiwind_Panel_Filename, Battery1DataFrame, Battery2DataFrame):
 
@@ -28,43 +33,51 @@ def agilentDataConversion(agilentDF, agilentMaxCurrent = 15, agilentMaxVoltage =
     agilentDF['Voltage'] = None
     return agilentDF
 
-def batteryPlots(batterydata, DependantVariable, axs):
+def batteryPlots(batterydata, DependantVariable, axs, xticks):
+    axs.grid(color='gray', linestyle='-', linewidth=1)
+    axs.xaxis.set_ticks(xticks)
     for battery in batterydata:
         axs.plot(battery["Time [s]"], battery[DependantVariable])
 
 
-def portPlots(ports, DependantVariable, axs):
+def portPlots(ports, DependantVariable, axs, xticks, yticks = None):
+    axs.grid(color='gray', linestyle='-', linewidth=1)
+    axs.xaxis.set_ticks(xticks)
+    if yticks is not None:
+        axs.yaxis.set_ticks(yticks)
     for port in ports:
         axs.plot(port["Sim Time"], port[DependantVariable])
 
 def MakePlots(ports, BatteryData, load):
+    xticks = np.arange(24)
+    voltageYticks = np.arange(26,29,.1)
+    print(xticks)
     fig, axs = plt.subplots(3)
     fig.suptitle(f'Voltage v Time')
     axs[0].set_title("Voltage as Reported by Batteries")
-    batteryPlots(BatteryData, 'Voltage[V]', axs[0])
+    batteryPlots(BatteryData, 'Voltage[V]', axs[0], xticks)
     axs[1].set_title("Voltage as reported by Panels")
-    portPlots(ports, 'Voltage', axs[1])
+    portPlots(ports, 'Voltage', axs[1], xticks)
     axs[2].set_title("Voltage as reported by Load")
-    portPlots(load, 'Voltage', axs[2])
+    portPlots(load, 'Voltage', axs[2], xticks, voltageYticks)
 
 
     fig, axs = plt.subplots(3)
     fig.suptitle(f'Current v Time')
     axs[0].set_title("Current as reported by Battery")
-    batteryPlots(BatteryData, 'Current [A]', axs[0])
+    batteryPlots(BatteryData, 'Current [A]', axs[0], xticks)
     axs[1].set_title("Current as reported by Panels")
-    portPlots(ports, 'Current', axs[1])
+    portPlots(ports, 'Current', axs[1], xticks)
     axs[2].set_title("Current as reported by Load")
-    portPlots(load, 'Current', axs[2])
-    plt.locator_params(axis='x', nbins=24)
+    portPlots(load, 'Current', axs[2], xticks)
 
     fig, axs = plt.subplots(2)
     axs[0].set_title("Solar Altitude")
-    portPlots(ports, 'Solar Alt', axs[0])
+    portPlots(ports, 'Solar Alt', axs[0], xticks)
     axs[1].set_title("Panel Efficiency")
-    portPlots(ports, 'Panel Eff', axs[1])
-
-
+    portPlots(ports, 'Panel Eff', axs[1], xticks)
+    axs[1].grid(color='gray', linestyle='-', linewidth=1)
+    axs[1].xaxis.set_ticks(xticks)
 
 
 Battery1Log = "2021-09-13-13-32-Serial-1.log"
@@ -83,10 +96,14 @@ p2 = data[data["Port"] == "com10"]
 p3 = data[data["Port"] == "com11"]
 p4 = data[data["Port"] == "com12"]
 p5 = data[data["Port"] == "com13"]
-load = [load] # so we can feed in the same function
+loads = [load] # so we can feed in the same function
 ports = [p1,p2,p3,p4,p5, aligent]
+for port in ports:
+    port = FormatPanelData(port)
+for load in loads:
+    load = FormatPanelData(load)
 
 B3data, B4data = MatchBeginnings(Battery1Log, PanelLog, B1data, B2data)
 BatteryData = [formatBatteryDataTime(B3data), formatBatteryDataTime(B4data)]
-MakePlots(ports, BatteryData, load)
+MakePlots(ports, BatteryData, loads)
 plt.show()
