@@ -49,10 +49,10 @@ def portPlots(ports, DependantVariable, axs, xticks, yticks = None):
         axs.plot(port["Sim Time"], port[DependantVariable])
 
 def MakePlots(ports, BatteryData, load):
-    xticks = np.arange(24)
+    xticks = np.arange(0,24,.5)
     voltageYticks = np.arange(26,29,.1)
     print(xticks)
-    fig, axs = plt.subplots(3)
+    fig, axs = plt.subplots(3, sharex=True)
     fig.suptitle(f'Voltage v Time')
     axs[0].set_title("Voltage as Reported by Batteries")
     batteryPlots(BatteryData, 'Voltage[V]', axs[0], xticks)
