@@ -285,4 +285,4 @@ def SetOutput(port, state):
         SendCommand(port, "OUTPUT OFF")
 
 logging_setup()
-RunSimulation(panels, load, agilent, 22, 5/3600, 1, 17, 50)
+RunSimulation(panels, load, agilent, 22, 1/3600, 1, 17, 50)
