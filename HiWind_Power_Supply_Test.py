@@ -125,7 +125,7 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
     SetAgilentCurrent(agilent_port, amps)
 
     # give time to update and leave transient state
-    time.sleep(2)
+    time.sleep(0.5)
     # re measure voltage and divide by 2 to get voltage on single panel
     panel_voltage = MeasureVoltage(panel_ports) / 2
     panel_current = np.interp(panel_voltage, V, I) * efficiency
@@ -284,4 +284,4 @@ def SetOutput(port, state):
         SendCommand(port, "OUTPUT OFF")
 
 logging_setup()
-RunSimulation(panels, load, agilent, 22, 1 / 60, 1)
+RunSimulation(panels, load, agilent, 22, 5/3600, 1)
