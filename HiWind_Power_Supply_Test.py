@@ -214,7 +214,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
     while (True):
         # Find how many Hours its been running
         elapsed_hr = (time.time() - start) / 3600 * time_scaling
-        time_of_day = (elapsed_hr + starting_hour) % 24
+        time_of_day = (elapsed_hr + starting_hour) % 24.0
 
         panelPair_v = MeasureVoltage(panel_ports)
         # battery_v = MeasureVoltage(load_port)
