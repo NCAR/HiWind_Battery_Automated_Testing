@@ -192,7 +192,7 @@ def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
 
 
 
-def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_duration, time_scaling):
+def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_duration, time_scaling, starting_hour, test_duration):
     # sleep duration is in hours
     start = time.time()
     # Setup all the DC Power supplies
@@ -213,6 +213,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
     while (True):
         # Find how many Hours its been running
         elapsed_hr = (time.time() - start) / 3600 * time_scaling
+        time_of_day = (elapsed_hour + starting_hour) % 24
 
         panelPair_v = MeasureVoltage(panel_ports)
         # battery_v = MeasureVoltage(load_port)
@@ -221,15 +222,15 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
 
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
-        load = SetLoad(load_port, elapsed_hr)
+        load = SetLoad(load_port, time_of_day)
 
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
-            elapsed_hr, SolarAltitude(elapsed_hr), eff * 100, i, load))
+            elapsed_hr, SolarAltitude(time_of_day), eff * 100, i, load))
 
 
-        write_to_log(all_ports, elapsed_hr, SolarAltitude(elapsed_hr), eff*100)
+        write_to_log(all_ports, elapsed_hr, SolarAltitude(time_of_day), eff*100)
 
-        if (elapsed_hr + sleep_duration * time_scaling) >= 24:
+        if (elapsed_hr + sleep_duration * time_scaling) >= test_duration:
             for p in panel_ports:
                 SetOutput(p, False)
             SetOutput(agilent_port, False)
@@ -284,4 +285,4 @@ def SetOutput(port, state):
         SendCommand(port, "OUTPUT OFF")
 
 logging_setup()
-RunSimulation(panels, load, agilent, 22, 5/3600, 1)
+RunSimulation(panels, load, agilent, 22, 5/3600, 1, 17, 50)
