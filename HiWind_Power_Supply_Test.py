@@ -213,12 +213,12 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
     while (True):
         # Find how many Hours its been running
         elapsed_hr = (time.time() - start) / 3600 * time_scaling
-        time_of_day = (elapsed_hour + starting_hour) % 24
+        time_of_day = (elapsed_hr + starting_hour) % 24
 
         panelPair_v = MeasureVoltage(panel_ports)
         # battery_v = MeasureVoltage(load_port)
         # Get and Efficiency Percentage of the panel
-        eff = PanelEfficiency(elapsed_hr, panel_angle)
+        eff = PanelEfficiency(time_of_day, panel_angle)
 
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
