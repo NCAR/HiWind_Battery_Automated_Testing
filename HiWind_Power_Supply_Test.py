@@ -134,6 +134,7 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
         # re set the current to better match
         iter += 1
         MatchIVCurve(panel_ports, agilent_port, panel_voltage, efficiency, iter)
+    print("Performed {:d} IV lookup iterations.".format(iter))
     return amps
 
 
