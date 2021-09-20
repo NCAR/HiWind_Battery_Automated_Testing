@@ -46,10 +46,15 @@ def portPlots(ports, DependantVariable, axs, xticks, yticks = None):
     if yticks is not None:
         axs.yaxis.set_ticks(yticks)
     for port in ports:
-        axs.plot(port["Sim Time"], port[DependantVariable])
+        print(port["Port"])
+        axs.plot(port["Sim Time"], port[DependantVariable], label = port["Port"].iloc[0])
+
+    axs.legend()
+    axs.set_ylabel(f"{DependantVariable}")
+    axs.set_xlabel(f"Time [Hours]")
 
 def MakePlots(ports, BatteryData, load):
-    xticks = np.arange(0,24,.5)
+    xticks = np.arange(0,51,1)
     voltageYticks = np.arange(26,29,.1)
     print(xticks)
     fig, axs = plt.subplots(3, sharex=True)
@@ -57,6 +62,7 @@ def MakePlots(ports, BatteryData, load):
     axs[0].set_title("Voltage as Reported by Batteries")
     batteryPlots(BatteryData, 'Voltage[V]', axs[0], xticks)
     axs[1].set_title("Voltage as reported by Panels")
+    axs[1].legend()
     portPlots(ports, 'Voltage', axs[1], xticks)
     axs[2].set_title("Voltage as reported by Load")
     portPlots(load, 'Voltage', axs[2], xticks, voltageYticks)
@@ -76,13 +82,13 @@ def MakePlots(ports, BatteryData, load):
     portPlots(ports, 'Solar Alt', axs[0], xticks)
     axs[1].set_title("Panel Efficiency")
     portPlots(ports, 'Panel Eff', axs[1], xticks)
-    axs[1].grid(color='gray', linestyle='-', linewidth=1)
+    axs[1].grid(color='gray', linestyle='-', linewidth=.5)
     axs[1].xaxis.set_ticks(xticks)
 
 
-Battery1Log = "2021-09-13-13-32-Serial-1.log"
-Battery2Log = "2021-09-13-13-32-Serial-2.log"
-PanelLog = 'HiWind_Panel_13Sep2021_1958.log'
+Battery1Log = "2021-09-17-18-26-Serial-1.log"
+Battery2Log = "2021-09-17-18-26-Serial-2.log"
+PanelLog = 'HiWind_Panel_17Sep2021_2150.log'
 data = pd.read_csv(PanelLog, header=0,delimiter='\t')
 B1data = pd.read_csv(Battery1Log, header=0,delimiter='\t')
 B2data = pd.read_csv(Battery2Log, header=0,delimiter='\t')
