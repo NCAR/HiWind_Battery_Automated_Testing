@@ -6,17 +6,21 @@ import serial, math, time
 import logging
 from datetime import datetime
 
-def BatteryRead(battery):
+#Sloppy But it works
+def BatteryParse(battery):
     try:
-        res = battery.readline()
-        return res.decode('ascii')
-    except:
-        return 'ERR'
+        ValidResponse = False
+        iter = 0
+        while (not ValidResponse) and (iter < 10):
+            response = battery.readline().decode('ascii')
+            try:
+                BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, Current = response.replace('*', '').strip('\n').strip('\r').split(',')
+                ValidResponse = True
+            except:
+                iter = iter +1
+                ValidResponse = False
 
-def BatteryParse(response):
-    try:
-        BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus = response.strip('*').split(',')
-        return BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus
+        return BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, Current
     except:
         return 'ERR'
 #*AAAA,BB.BBB,CCC,DDD,EEEE,FFF, ±GGG.GGG" \
@@ -209,7 +213,7 @@ def write_to_log(ports, batteries, elapsedTime, Solar_Alt, Panel_Eff):
         Current = "{:5.2f}".format(MeasureCurrent(port))
         panel_logger.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
     for battery in batteries:
-        BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, BatteryCurrent = BatteryRead(battery)
+        BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, BatteryCurrent = BatteryParse(battery)
         battery_logger.info(f"{Time}\t{Sim_Time}\t{BatteryID}\t{BatteryVoltage}\t{BatteryTemperature}\t{HeatSinkTemperature}\t{SystemStatus}\t{SOC}\t{BatteryCurrent}")
 
 
@@ -338,8 +342,8 @@ agilent = serial.Serial("com28", 9600, timeout=0.5)
 panels = [p1, p2, p3, p4, p5]
 
 
-b1 = serial.Serial("com21", 9600, timeout=0.5)
-b2 = serial.Serial("com22", 9600, timeout=0.5)
+b1 = serial.Serial("com21", 57600, timeout=0.5)
+b2 = serial.Serial("com22", 57600, timeout=0.5)
 batteries = [b1, b2]
 
 global battery_logger
