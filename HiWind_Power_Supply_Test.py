@@ -150,7 +150,8 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
         "Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency,
                                                                                                     amps, iter))
     SetCurrent(panel_ports, amps)
-    SetAgilentCurrent(agilent_port, amps)
+    if agilent_port is not False:
+        SetAgilentCurrent(agilent_port, amps)
 
     # give time to update and leave transient state
     time.sleep(0.5)
@@ -213,8 +214,11 @@ def write_to_log(ports, batteries, elapsedTime, Solar_Alt, Panel_Eff):
         Current = "{:5.2f}".format(MeasureCurrent(port))
         panel_logger.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
     for battery in batteries:
-        BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, BatteryCurrent = BatteryParse(battery)
-        battery_logger.info(f"{Time}\t{Sim_Time}\t{BatteryID}\t{BatteryVoltage}\t{BatteryTemperature}\t{HeatSinkTemperature}\t{SystemStatus}\t{SOC}\t{BatteryCurrent}")
+        try:
+         BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, BatteryCurrent = BatteryParse(battery)
+         battery_logger.info(f"{Time}\t{Sim_Time}\t{BatteryID}\t{BatteryVoltage}\t{BatteryTemperature}\t{HeatSinkTemperature}\t{SystemStatus}\t{SOC}\t{BatteryCurrent}")
+        except:
+            battery_logger.info(f"{Time}\t{Sim_Time}\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL")
 
 
     # Voltage
@@ -231,16 +235,18 @@ def RunSimulation(panel_ports, load_port, agilent_port, battery_ports, panel_ang
     start = time.time()
     # Setup all the DC Power supplies
     all_ports = panel_ports
-    all_ports.append(agilent_port)
+    if agilent_port is not False:
+        all_ports.append(agilent_port)
     if useLoad:
         all_ports.append(load_port)
     for p in panel_ports:
         SetVoltage(p, 40)
         SetCurrent(p, 0)
         SetOutput(p, True)
-    SetCurrent(agilent_port, 1 / 30)  # make sure our control signal cannot push current
-    SetVoltage(agilent_port, 0)  # this turns off the current from the agilent to the MEER
-    SetOutput(agilent_port, True)
+    if agilent_port is not False:
+        SetCurrent(agilent_port, 1 / 30)  # make sure our control signal cannot push current
+        SetVoltage(agilent_port, 0)  # this turns off the current from the agilent to the MEER
+        SetOutput(agilent_port, True)
     # Setup the DC load
     if useLoad:
         SetCurrent(load_port, 0)
@@ -335,11 +341,12 @@ p2 = serial.Serial("com24", 9600, timeout=0.5)
 p3 = serial.Serial("com25", 9600, timeout=0.5)
 p4 = serial.Serial("com26", 9600, timeout=0.5)
 p5 = serial.Serial("com27", 9600, timeout=0.5)
-
+p6 = serial.Serial("com28", 9600, timeout=0.5)
 #load = serial.Serial("com10", 9600, timeout=0.5)
 load = False
-agilent = serial.Serial("com28", 9600, timeout=0.5)
-panels = [p1, p2, p3, p4, p5]
+#agilent = serial.Serial("com28", 9600, timeout=0.5)
+agilent = False
+panels = [p1, p2, p3, p4, p5, p6]
 
 
 b1 = serial.Serial("com21", 57600, timeout=0.5)
@@ -354,4 +361,4 @@ panel_logger = logging_setup_panel()
 
 MaxAmpPerSupply = 6.1
 
-RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 17, 50, False)
+RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, False)
