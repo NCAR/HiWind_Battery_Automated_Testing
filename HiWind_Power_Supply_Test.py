@@ -6,30 +6,57 @@ import serial, math, time
 import logging
 from datetime import datetime
 
-if (plot_data):
-    import matplotlib.pyplot as plt
-#  get_ipython().run_line_magic('matplotlib', '')
+#Sloppy But it works
+def BatteryParse(battery):
+    try:
+        ValidResponse = False
+        iter = 0
+        while (not ValidResponse) and (iter < 10):
+            response = battery.readline().decode('ascii')
+            try:
+                BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, Current = response.replace('*', '').strip('\n').strip('\r').split(',')
+                ValidResponse = True
+            except:
+                iter = iter +1
+                ValidResponse = False
+
+        return BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, Current
+    except:
+        return 'ERR'
+#*AAAA,BB.BBB,CCC,DDD,EEEE,FFF, ±GGG.GGG" \
+#where:
+#AAAA = unique battery ID in Hex" \
+#BB.BBB = battery voltage in volts
+#CCC = battery temperature in °C. Note: temperature sensor is secured against the
+#middle of the lowest voltage cell block
+#DDD = Central Controller Heat Sink temperature in °C
+#EEEE is system status in Hex containing the following bit mapped information:"
+
+def logging_setup_battery():
+    logger = logging_setup("Battery")
+    logger.info("Time\tSim Time\tID\tVoltage\tBat Temp[C]\tHeatSink Temp[C]\tStatus\tSOC\tCurrent")
+    return logger
 
 
-# TODO Do we need to becarful bc the Com Ports and swap around
-# between systems Make sure if your using the Aligent you figure this out in the future
-p1 = serial.Serial("com9", 9600, timeout=0.5)
-p2 = serial.Serial("com10", 9600, timeout=0.5)
-p3 = serial.Serial("com11", 9600, timeout=0.5)
-p4 = serial.Serial("com12", 9600, timeout=0.5)
-p5 = serial.Serial("com13", 9600, timeout=0.5)
+def logging_setup_panel():
+    logger = logging_setup("Panel")
+    logger.info("Time\tSim Time\tSolar Alt\tPanel Eff\tPort\tVoltage\tCurrent")
+    return logger
 
-load = serial.Serial("com7", 9600, timeout=0.5)
-agilent = serial.Serial("com8", 9600, timeout=0.5)
-panels = [p1, p2, p3, p4, p5]
 
-MaxAmpPerSupply = 6.1
+def logging_setup(name, level=logging.DEBUG):
 
-def logging_setup():
     CurrentDateTime = datetime.now().strftime("%d%b%Y_%H%M")
-    filename=f"HiWind_Panel_{CurrentDateTime}.log"
-    logging.basicConfig(format='%(message)s',filename=filename, level=logging.DEBUG)
-    logging.info("Time\tSim Time\tSolar Alt\tPanel Eff\tPort\tVoltage\tCurrent")
+    filename=f"HiWind_{name}_{CurrentDateTime}.log"
+    formatter = logging.Formatter('%(message)s')
+
+    handler = logging.FileHandler(filename)
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+    return logger
 
 # brief Measure the voltage on the ports
 # @return the lowest reported voltage arcross the given list of ports or the voltage on the port itself
@@ -39,6 +66,7 @@ def MeasureVoltage(ports):
         # Find the lowest voltage on all the ports and report that
         for p in ports:
             v = MeasureVoltage(p)
+            print(v)
             if v < voltage:
                 voltage = v
     else:
@@ -122,7 +150,8 @@ def MatchIVCurve(panel_ports, agilent_port, voltage, efficiency, iter=0):
         "Voltage is {:.1f} V, efficiency {:.2f}, setting current to {:.1f}, iteration {:d}.".format(voltage, efficiency,
                                                                                                     amps, iter))
     SetCurrent(panel_ports, amps)
-    SetAgilentCurrent(agilent_port, amps)
+    if agilent_port is not False:
+        SetAgilentCurrent(agilent_port, amps)
 
     # give time to update and leave transient state
     time.sleep(0.5)
@@ -172,7 +201,7 @@ def SetLoad(port, hour):
     return load
 
 
-def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
+def write_to_log(ports, batteries, elapsedTime, Solar_Alt, Panel_Eff):
 
     Time = str(datetime.now().strftime("%d%b%y %H:%M:%S"))
 
@@ -183,7 +212,15 @@ def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
         Port = port.name
         Voltage = "{:5.2f}".format(MeasureVoltage(port))
         Current = "{:5.2f}".format(MeasureCurrent(port))
-        logging.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
+        panel_logger.info(f"{Time}\t{Sim_Time}\t{Solar_Alt}\t{Panel_Eff}\t{Port}\t{Voltage}\t{Current}")
+    for battery in batteries:
+        try:
+         BatteryID, BatteryVoltage, BatteryTemperature, HeatSinkTemperature, SystemStatus, SOC, BatteryCurrent = BatteryParse(battery)
+         battery_logger.info(f"{Time}\t{Sim_Time}\t{BatteryID}\t{BatteryVoltage}\t{BatteryTemperature}\t{HeatSinkTemperature}\t{SystemStatus}\t{SOC}\t{BatteryCurrent}")
+        except:
+            battery_logger.info(f"{Time}\t{Sim_Time}\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL")
+
+
     # Voltage
     # Current
     # Time
@@ -193,23 +230,27 @@ def write_to_log(ports, elapsedTime, Solar_Alt, Panel_Eff):
 
 
 
-def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_duration, time_scaling, starting_hour, test_duration):
+def RunSimulation(panel_ports, load_port, agilent_port, battery_ports, panel_angle, sleep_duration, time_scaling, starting_hour, test_duration, useLoad = True):
     # sleep duration is in hours
     start = time.time()
     # Setup all the DC Power supplies
     all_ports = panel_ports
-    all_ports.append(agilent_port)
-    all_ports.append(load_port)
+    if agilent_port is not False:
+        all_ports.append(agilent_port)
+    if useLoad:
+        all_ports.append(load_port)
     for p in panel_ports:
         SetVoltage(p, 40)
         SetCurrent(p, 0)
         SetOutput(p, True)
-    SetCurrent(agilent_port, 1 / 30)  # make sure our control signal cannot push current
-    SetVoltage(agilent_port, 0)  # this turns off the current from the agilent to the MEER
-    SetOutput(agilent_port, True)
+    if agilent_port is not False:
+        SetCurrent(agilent_port, 1 / 30)  # make sure our control signal cannot push current
+        SetVoltage(agilent_port, 0)  # this turns off the current from the agilent to the MEER
+        SetOutput(agilent_port, True)
     # Setup the DC load
-    SetCurrent(load_port, 0)
-    SetInput(load_port, True)
+    if useLoad:
+        SetCurrent(load_port, 0)
+        SetInput(load_port, True)
 
     while (True):
         # Find how many Hours its been running
@@ -223,19 +264,21 @@ def RunSimulation(panel_ports, load_port, agilent_port, panel_angle, sleep_durat
 
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
-        load = SetLoad(load_port, time_of_day)
+        if useLoad:
+            load = SetLoad(load_port, time_of_day)
 
-        print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out {:5.2f}".format(
-            elapsed_hr, SolarAltitude(time_of_day), eff * 100, i, load))
+        print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out NULL".format(
+            elapsed_hr, SolarAltitude(time_of_day), eff * 100, i))
 
 
-        write_to_log(all_ports, elapsed_hr, SolarAltitude(time_of_day), eff*100)
+        write_to_log(all_ports,battery_ports, elapsed_hr, SolarAltitude(time_of_day), eff*100)
 
         if (elapsed_hr + sleep_duration * time_scaling) >= test_duration:
             for p in panel_ports:
                 SetOutput(p, False)
             SetOutput(agilent_port, False)
-            SetInput(load_port, False)
+            if useLoad:
+                SetInput(load_port, False)
             return
         # wait one sleep duration
         time.sleep(sleep_duration * 3600)
@@ -285,5 +328,37 @@ def SetOutput(port, state):
     else:
         SendCommand(port, "OUTPUT OFF")
 
-logging_setup()
-RunSimulation(panels, load, agilent, 22, 1/3600, 1, 17, 50)
+
+if (plot_data):
+    import matplotlib.pyplot as plt
+#  get_ipython().run_line_magic('matplotlib', '')
+
+
+# TODO Do we need to becarful bc the Com Ports and swap around
+# between systems Make sure if your using the Aligent you figure this out in the future
+p1 = serial.Serial("com23", 9600, timeout=0.5)
+p2 = serial.Serial("com24", 9600, timeout=0.5)
+p3 = serial.Serial("com25", 9600, timeout=0.5)
+p4 = serial.Serial("com26", 9600, timeout=0.5)
+p5 = serial.Serial("com27", 9600, timeout=0.5)
+p6 = serial.Serial("com28", 9600, timeout=0.5)
+#load = serial.Serial("com10", 9600, timeout=0.5)
+load = False
+#agilent = serial.Serial("com28", 9600, timeout=0.5)
+agilent = False
+panels = [p1, p2, p3, p4, p5, p6]
+
+
+b1 = serial.Serial("com21", 57600, timeout=0.5)
+b2 = serial.Serial("com22", 57600, timeout=0.5)
+batteries = [b1, b2]
+
+global battery_logger
+global panel_logger
+battery_logger = logging_setup_battery()
+panel_logger = logging_setup_panel()
+
+
+MaxAmpPerSupply = 6.1
+
+RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, False)
