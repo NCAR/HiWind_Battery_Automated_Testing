@@ -190,7 +190,7 @@ def PanelEfficiency(hour, PanelAngle):
 
 def SetLoad(port, hour):
     H = np.array([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24])
-    L = np.array([7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7])
+    L = np.array([8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8])
     if (plot_data):
         if not plt.fignum_exists(3):
             plt.figure(3)
@@ -265,7 +265,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, battery_ports, panel_ang
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
         if useLoad:
-            load = SetLoad(load_port, time_of_day)
+           load = SetLoad(load_port, time_of_day)
 
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out NULL".format(
             elapsed_hr, SolarAltitude(time_of_day), eff * 100, i))
@@ -342,8 +342,8 @@ p3 = serial.Serial("com25", 9600, timeout=0.5)
 p4 = serial.Serial("com26", 9600, timeout=0.5)
 p5 = serial.Serial("com27", 9600, timeout=0.5)
 p6 = serial.Serial("com28", 9600, timeout=0.5)
-#load = serial.Serial("com10", 9600, timeout=0.5)
-load = False
+load = serial.Serial("com10", 9600, timeout=0.5)
+#load = False
 #agilent = serial.Serial("com28", 9600, timeout=0.5)
 agilent = False
 panels = [p1, p2, p3, p4, p5, p6]
@@ -361,4 +361,4 @@ panel_logger = logging_setup_panel()
 
 MaxAmpPerSupply = 6.1
 
-RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, False)
+RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, useLoad=True)

@@ -1,3 +1,4 @@
+import matplotlib.pyplot
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime
@@ -37,7 +38,7 @@ def batteryPlots(batterydata, DependantVariable, axs, xticks):
     axs.grid(color='gray', linestyle='-', linewidth=1)
     axs.xaxis.set_ticks(xticks)
     for battery in batterydata:
-        axs.plot(battery["Time [s]"], battery[DependantVariable])
+        axs.plot(battery["Sim Time"], battery[DependantVariable])
 
 
 def portPlots(ports, DependantVariable, axs, xticks, yticks = None):
@@ -109,7 +110,50 @@ for port in ports:
 for load in loads:
     load = FormatPanelData(load)
 
-B3data, B4data = MatchBeginnings(Battery1Log, PanelLog, B1data, B2data)
-BatteryData = [formatBatteryDataTime(B3data), formatBatteryDataTime(B4data)]
-MakePlots(ports, BatteryData, loads)
+
+def CleanLogFile(infile):
+    newFile = infile.replace('.log','_Cleaned.log')
+    bad_words = ['ADC', '00009', '00008', 'NULL']
+    with open(infile) as inf, open(newFile, 'w') as newf:
+        for line in inf:
+            if not any(bad_word in line for bad_word in bad_words):
+                newf.write(line)
+    return newFile
+
+
+def BatteryPlot(infile):
+    Data = pd.read_csv(infile, header=0, delimiter='\t')
+    df1 = Data[Data['ID'].str.contains('^0008', na=False)]
+    df2 = Data[Data['ID'].str.contains('^0009', na=False)]
+
+    df1['Sim Time'] = pd.to_numeric(df1['Sim Time'].map(lambda x: x.rstrip('hr')), errors='coerce')
+    df1["Voltage"] = pd.to_numeric(df1["Voltage"], errors='coerce')
+    df2['Sim Time'] = pd.to_numeric(df2['Sim Time'].map(lambda x: x.rstrip('hr')), errors='coerce')
+    df2["Voltage"] = pd.to_numeric(df2["Voltage"], errors='coerce')
+
+
+
+
+    print(df1['Sim Time'])
+    xticks = np.arange(0, 51, 1)
+    voltageYticks = np.arange(26, 29, .1)
+    print(xticks)
+    fig, axs = plt.subplots(1, sharex=True)
+    fig.suptitle(f'Voltage v Time')
+    axs.set_title("Voltage as Reported by Batteries")
+    axs.grid(color='gray', linestyle='-', linewidth=1)
+    axs.xaxis.set_ticks(xticks)
+    axs.plot(df1["Sim Time"], df1["Voltage"])
+    axs.plot(df2["Sim Time"], df2["Voltage"])
+
+
+infile= "HiWind_Battery_09Nov2021_1755.log"
+BatteryPlot(infile)
 plt.show()
+#B3data, B4data = MatchBeginnings(Battery1Log, PanelLog, B1data, B2data)
+#BatteryData = BatteryData()
+#BatteryData = [formatBatteryDataTime(B3data), formatBatteryDataTime(B4data)]
+#MakePlots(ports, BatteryData, loads)
+#plt.show()
+
+
