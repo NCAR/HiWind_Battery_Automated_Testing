@@ -361,4 +361,5 @@ panel_logger = logging_setup_panel()
 
 MaxAmpPerSupply = 6.1
 
+
 RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, useLoad=True)
