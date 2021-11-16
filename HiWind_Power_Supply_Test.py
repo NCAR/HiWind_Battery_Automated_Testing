@@ -265,7 +265,7 @@ def RunSimulation(panel_ports, load_port, agilent_port, battery_ports, panel_ang
         i = MatchIVCurve(panel_ports, agilent_port, panelPair_v / 2, eff)
         # i=SetILimits(panel_ports, battery_v/2, eff)  # batt/2 because each supply is two panels
         if useLoad:
-            load = SetLoad(load_port, time_of_day)
+           load = SetLoad(load_port, time_of_day)
 
         print("Elapsed: {:5.2f} hr   Solar Alt: {:2.0f} d  Panel Eff: {:2.0f}%  Current in {:5.2f} out NULL".format(
             elapsed_hr, SolarAltitude(time_of_day), eff * 100, i))
@@ -361,4 +361,5 @@ panel_logger = logging_setup_panel()
 
 MaxAmpPerSupply = 6.1
 
-RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, useLoad = True)
+
+RunSimulation(panels, load, agilent, batteries, 22, 1/3600, 1, 18, 50, useLoad=True)
